@@ -102,6 +102,19 @@ export function processTitle(torrentTitle:string):bangumiTorrent {
     const [seasonInfo,episodeInfo, other] = match_obj?.slice(1).map(x => x.trim()) || [];
     if(seasonInfo === undefined ){
         console.log(torrentTitle);
+        return {
+            name   : "998454323",
+            season : "",
+            episode: "",
+            sub    : "",//字幕类型(简繁E)
+            dpi    : "",//清晰度
+            source : "",//bilibili AT-X...
+            group  : "",//字幕组
+            torrent: "",//torrentUrl;
+            dow    : "",//星期几
+            cover  : "",//封面
+            bgmId  : "",//mikanani.id
+        }
     }
     const processRaw = prefixProcess(seasonInfo,group);
     const [raw_name, season_raw] = processSeason(processRaw);//季 名字

@@ -29,7 +29,7 @@ export async function parseAll(){//HomePage first.
     logger.debug("Start grabing..")
     await axios.get(HOMEPAGE,config).then(async response => {
         await client.connect();
-        await client.query(`CREATE TABLE IF NOT EXISTS bangumi (
+        await client.query(`CREATE TABLE IF NOT EXISTS bangumitorrent (
             name text,
             season text,
             episode text,
@@ -42,7 +42,13 @@ export async function parseAll(){//HomePage first.
             bgmid text,
             torrent text
         )`);
-        
+        await client.query(`
+        CREATE TABLE IF NOT EXISTS bangumiinfo (
+            name text,
+            cover text,
+            mikanid text,
+            dow text
+        )`);
         logger.debug("try to create table...")
         
         const html = response.data;
@@ -78,6 +84,7 @@ function sleep(ms:number) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 export async function parseBangumi(href : string,image :string, title: string,dow: string){
+    await client.query("INSERT INTO bangumiinfo (name,cover,mikanid,dow) VALUES (\$1 ,\$2  ,\$3 ,\$4 ) ",[title,image,href.replace("/Home/Bangumi/",""),dow]);
     const rssUrl = `${RSS_URL}${href.replace("/Home/Bangumi/","")}`;
     logger.debug(`grab one bangumi by rss: ${rssUrl}`);
     await axios.get(rssUrl,config)
@@ -87,6 +94,7 @@ export async function parseBangumi(href : string,image :string, title: string,do
         const parser = new Parser();
         await parser.parseString(rss)
         .then(async feed => {
+            
             feed.items.forEach(async (ele)=>{
                 let flag = 114514;
                 for(let skips of skip_list){
@@ -106,12 +114,15 @@ export async function parseBangumi(href : string,image :string, title: string,do
                 }
                 if(flag === 114514){
                     const torrentAttr = processTitle(ele.title || "");
+                    if(torrentAttr.name === "998454323"){
+                        return;
+                    }
                     torrentAttr.dow = dow;
                     torrentAttr.cover = `https://mikanani.me/${image}`;
                     torrentAttr.bgmId = href.replace("/Home/Bangumi/","");
                     torrentAttr.name = title;
                     torrentAttr.torrent = ele.enclosure?.url || "";
-                    await saveToDB(torrentAttr);
+                    await saveToBangumiDB(torrentAttr);
                 }
             })
         }).catch(err=>{
@@ -121,11 +132,11 @@ export async function parseBangumi(href : string,image :string, title: string,do
         logger.error(err);
     })
 }
-async function saveToDB(attr: bangumiTorrent){
-    const query = `INSERT INTO bangumi (name, season, episode, sub, dpi, source, subgroup, dow, cover, bgmid, torrent)
+async function saveToBangumiDB(attr: bangumiTorrent){
+    const query = `INSERT INTO bangumitorrent (name, season, episode, sub, dpi, source, subgroup, dow, cover, bgmid, torrent)
     VALUES (\$1, \$2, \$3, \$4, \$5, \$6, \$7, \$8, \$9, \$10, \$11)
     `;
     const values = [attr.name,attr.season,attr.episode,attr.sub,attr.dpi,attr.source,attr.sub,attr.dow,attr.cover,attr.bgmId,attr.torrent];
     await client.query(query,values);
-    logger.log(`Saved to db. ${attr.name}`);
+    logger.log(`Saved to db. ${attr.name} ${attr.episode}`);
 }
