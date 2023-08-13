@@ -1,3 +1,10 @@
+// import readline from 'readline';
+import logger from './logger';
+import fs from 'fs';
+// const rl = readline.createInterface({
+    // input: process.stdin,
+    // output: process.s?tdout
+// })
 //thx to https://github.com/EstrellaXD/Auto_Bangumi/blob/67f0b81458f801569d5282ee8f23b0846e0bc1f4/backend/src/module/parser/analyser/raw_parser.py
 const episode_re = /\d+/;
 const title_re = /(.*|\[.*])( -? \d+|\[\d+]|\[\d+.?[vV]\d]|第\d+[话話集]|\[第?\d+[话話集]]|\[\d+.?END]|[Ee][Pp]?\d+)(.*)/;
@@ -22,13 +29,12 @@ export type bangumiTorrent = {
     bgmId  : string;//mikanani.id
 }
 function process_prefix(title: string): string{//去除中文字符
-    return title.replace("【", "[").replace("】", "]").replace("（","(").replace("）",")");
+    return title.replace(/【/g, "[").replace(/】/g, "]");
 }
 function getGroup(title: string):string {//字幕组！
     return title.split(/[\[\]]/)[1];
 }
 function prefixProcess(title:string,group:string):string{
-    console.log(title,group);
     title = title.replace(new RegExp(`.${group}.`,'g'),'');
     const pTitle = title.replace(prefix_re,"/");
     let arg_group = pTitle.split("/");
@@ -57,7 +63,7 @@ function processSeason(season_info:string){
     let season_raw = "";
     let season: number | string = 1;
     if(seasons.length ==0) {
-        return [name_season,"1"];
+        return [name_season,"1","1"];
     }
     name = name.replace(new RegExp(season_re,'g'),"");
     for(let seasonIt of seasons) {
@@ -70,7 +76,7 @@ function processSeason(season_info:string){
             
         }
     }
-    return [name,season_raw];
+    return [name,season_raw, `${season}`];
 }
 
 function find_tags(other: string){
@@ -94,7 +100,48 @@ function find_tags(other: string){
     }
     return  [sub,resolution,source];
 }
-export function processTitle(torrentTitle:string):bangumiTorrent {
+function processSub(sub:string){//简繁E
+    sub = sub.trim();
+    sub = sub.replace("CHT","繁");
+    sub = sub.replace("CHS","简");
+    sub = sub.replace("内嵌","");
+    sub = sub.replace("外挂","");
+    sub = sub.replace("特字","");
+    sub = sub.replace("双语","");
+    sub = sub.replace("日","");
+    sub = sub.replace("体","");
+    sub = sub.replace("字幕社招人内详","");
+    sub = sub.replace("中","");
+    sub = sub.replace("_","");
+    sub = sub.replace("内封","");
+    sub = sub.replace("BIG5","繁");
+    sub = sub.replace("JP","");
+    sub = sub.replace("GB","简");
+    sub = sub.replace("&","");
+    sub = sub.replace("语字幕","");
+    return sub;
+}
+export function processMovieTitle(torrentTitle:string){
+    logger.debug("Find Movie and OVA now...\n can't process anymore,please find it in /mova.txt,modify yourself and put it into mova.json");
+    fs.appendFile('mova.txt',torrentTitle,(err)=>{
+        if(err) logger.error(err);
+        logger.debug("write to file.")
+    })
+    return {
+        name   : "998454323",
+        season : "",
+        episode: "",
+        sub    : "",//字幕类型(简繁E)
+        dpi    : "",//清晰度
+        source : "",//bilibili AT-X...
+        group  : "",//字幕组
+        torrent: "",//torrentUrl;
+        dow    : "",//星期几
+        cover  : "",//封面
+        bgmId  : "",//mikanani.id
+    }
+}
+export function processAnimeTitle(torrentTitle:string):bangumiTorrent {
     torrentTitle = torrentTitle.trim();
     const contentTitle = process_prefix(torrentTitle);
     const group = getGroup(contentTitle);
@@ -102,6 +149,9 @@ export function processTitle(torrentTitle:string):bangumiTorrent {
     const [seasonInfo,episodeInfo, other] = match_obj?.slice(1).map(x => x.trim()) || [];
     if(seasonInfo === undefined ){
         console.log(torrentTitle);
+        console.log(contentTitle);
+        console.log(group);
+        console.log(match_obj);
         return {
             name   : "998454323",
             season : "",
@@ -117,14 +167,14 @@ export function processTitle(torrentTitle:string):bangumiTorrent {
         }
     }
     const processRaw = prefixProcess(seasonInfo,group);
-    const [raw_name, season_raw] = processSeason(processRaw);//季 名字
+    const [raw_name, season_raw, season] = processSeason(processRaw);//季 名字
     const episode = episodeInfo.match(episode_re);//集数
     const [sub,dpi,source] = find_tags(other);
     return {
         name   : raw_name,
-        season : season_raw,
-        episode: episode?episode.join(""):"",
-        sub    : sub|| "",//字幕类型(简繁E)
+        season : season,
+        episode: `${parseInt(episode?episode.join(""):"0")}`,
+        sub    : processSub(sub || ""),//字幕类型(简繁E)
         dpi    : dpi|| "",//清晰度
         source : source||"",//bilibili AT-X...
         group  : group,//字幕组
