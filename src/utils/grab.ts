@@ -4,7 +4,7 @@ import Parser from 'rss-parser';
 import {Client} from 'pg';
 import logger from './logger';
 import {processAnimeTitle,bangumiTorrent, processMovieTitle} from './parser';
-
+import * as fs from 'fs';
 const skip_list : string[]= [
 "梦蓝字幕组"
 ,"六四位元字幕组"
@@ -30,22 +30,25 @@ export async function parseAll(){//HomePage first.
     await axios.get(HOMEPAGE,config).then(async response => {
         await client.connect();
         await client.query(`CREATE TABLE IF NOT EXISTS bangumitorrent (
+            id serial PRIMARY KEY,
             name text,
-            season text,
-            episode text,
+            season integer,
+            episode integer,
             sub text,
             dpi text,
             source text,
             subgroup text,
             dow text,
-            mikanid text,
-            torrent text
-        )`);
+            mikanid integer,
+            torrent text unique,
+            update_time integer
+)`);
         await client.query(`
         CREATE TABLE IF NOT EXISTS bangumiinfo (
-            name text,
+            id serial primary key,
+            name text unique,
             cover text,
-            mikanid text,
+            mikanid integer unique,
             dow text
         )`);
         logger.debug("try to create table...")
@@ -57,6 +60,7 @@ export async function parseAll(){//HomePage first.
             const dow = $(ele).attr('data-dayofweek') || "10";
             const lis = $(ele).find("li");
             for(const li of lis){
+                await sleep(1000);
                 const linkEle = $(li).find("a.an-text");
                 const imgEle = li.childNodes[1];
                 if(linkEle.length !=0 ){
@@ -81,7 +85,7 @@ function sleep(ms:number) {
 function dowTostring(dow:string){
     let dowI = parseInt(dow);
     if(dowI>=0 && dowI<=6){
-        return "星期"+["日","一","二","三","四","五","六"][dowI]
+        return ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][dowI]
     }
     else return ["剧场版","OVA"][dowI-7]
 }
@@ -113,8 +117,7 @@ export async function parseBangumi(href : string,image :string, title: string,do
         const parser = new Parser();
         await parser.parseString(rss)
         .then(async feed => {
-            
-            feed.items.forEach(async (ele)=>{
+            await feed.items.forEach(async (ele)=>{
                 for(let skips of skip_list){
                     if(ele.title?.indexOf(skips)!==-1){
                         return;
@@ -153,6 +156,7 @@ export async function parseBangumi(href : string,image :string, title: string,do
                 if(torrentAttr.name === "998454323"){
                     return;
                 }
+                // await writeToFile(ele.title || "","source.txt");
                 torrentAttr.dow = dowTostring(dow);
                 torrentAttr.cover = `https://mikanani.me${image}`;
                 torrentAttr.bgmId = href.replace("/Home/Bangumi/","");
@@ -160,8 +164,10 @@ export async function parseBangumi(href : string,image :string, title: string,do
                 let dealTorrent = (url:string) => {
                     return url.replace("https://mikanani.me/Download/","").replace(".torrent","");
                 }
+                
+                // await writeToFile(JSON.stringify([torrentAttr.group,torrentAttr.name,torrentAttr.episode,torrentAttr.sub,torrentAttr.dpi,torrentAttr.source]),"process.txt");
                 torrentAttr.torrent = dealTorrent(ele.enclosure?.url || "https://mikanani.me/Download/.torrent");
-                await saveToBangumiDB(torrentAttr);
+                await saveToBangumiDB(torrentAttr,ele.title || "");
             })
         }).catch(err=>{
             logger.error(err);
@@ -170,15 +176,16 @@ export async function parseBangumi(href : string,image :string, title: string,do
         logger.error(err);
     })
 }
-async function saveToBangumiDB(attr: bangumiTorrent){
+async function saveToBangumiDB(attr: bangumiTorrent,fullname:string){
     /*     INSERT INTO bangumi (name, season, episode, sub, dpi, source, subgroup, dow, cover, bgmid, torrent)
     VALUES (\$1, \$2, \$3, \$4, \$5, \$6, \$7, \$8, \$9, \$10, \$11)
     ON CONFLICT (torrent) DO NOTHING */
-    const query = `INSERT INTO bangumitorrent (name, season, episode, sub, dpi, source, subgroup, dow, mikanid, torrent)
-    VALUES (\$1, \$2, \$3, \$4, \$5, \$6, \$7, \$8, \$9, \$10)
+    const query = `INSERT INTO bangumitorrent (name, season, episode, sub, dpi, source, subgroup, dow, mikanid, torrent, update_time,full_name)
+    VALUES (\$1, \$2, \$3, \$4, \$5, \$6, \$7, \$8, \$9, \$10, \$11, \$12)
     ON CONFLICT (torrent) DO NOTHING
     `;
-    const values = [attr.name,attr.season,attr.episode,attr.sub,attr.dpi,attr.source,attr.group,attr.dow,attr.bgmId,attr.torrent];
+    const [date,torrent] = attr.torrent.split("/")
+    const values = [attr.name,attr.season,attr.episode,attr.sub,attr.dpi,attr.source,attr.group,attr.dow,attr.bgmId,torrent,date,fullname];
     await client.query(query,values);
     logger.log(`Saved to db. [${attr.group}] ${attr.name} ${attr.episode}`);
 }

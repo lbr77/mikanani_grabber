@@ -1,10 +1,6 @@
 // import readline from 'readline';
 import logger from './logger';
 import fs from 'fs';
-// const rl = readline.createInterface({
-    // input: process.stdin,
-    // output: process.s?tdout
-// })
 //thx to https://github.com/EstrellaXD/Auto_Bangumi/blob/67f0b81458f801569d5282ee8f23b0846e0bc1f4/backend/src/module/parser/analyser/raw_parser.py
 const episode_re = /\d+/;
 const title_re = /(.*|\[.*])( -? \d+|\[\d+]|\[\d+.?[vV]\d]|第\d+[话話集]|\[第?\d+[话話集]]|\[\d+.?END]|[Ee][Pp]?\d+)(.*)/;
@@ -78,7 +74,6 @@ function processSeason(season_info:string){
     }
     return [name,season_raw, `${season}`];
 }
-
 function find_tags(other: string){
     const elements = other.replace(/[\[\]()（）]/g," ").split(" ").filter(x => x!=="");
     let sub: string | null = null;
@@ -101,25 +96,35 @@ function find_tags(other: string){
     return  [sub,resolution,source];
 }
 function processSub(sub:string){//简繁E
-    sub = sub.trim();
-    sub = sub.replace("CHT","繁");
-    sub = sub.replace("CHS","简");
-    sub = sub.replace("内嵌","");
-    sub = sub.replace("外挂","");
-    sub = sub.replace("特字","");
-    sub = sub.replace("双语","");
-    sub = sub.replace("日","");
-    sub = sub.replace("体","");
-    sub = sub.replace("字幕社招人内详","");
-    sub = sub.replace("中","");
-    sub = sub.replace("_","");
-    sub = sub.replace("内封","");
-    sub = sub.replace("BIG5","繁");
-    sub = sub.replace("JP","");
-    sub = sub.replace("GB","简");
-    sub = sub.replace("&","");
-    sub = sub.replace("语字幕","");
-    return sub;
+    return sub.trim()
+    .replace("CHT","繁")
+    .replace("CHS","简")
+    .replace("内嵌","")
+    .replace("外挂","")
+    .replace("特字","")
+    .replace("双语","")
+    .replace("日","")
+    .replace("体","")
+    .replace("字幕社招人内详","")
+    .replace("中","")
+    .replace("_","")
+    .replace("内封","")
+    .replace("BIG5","繁")
+    .replace("JP","")
+    .replace("GB","简")
+    .replace("&","")
+    .replace("语字幕","")
+    .replace("语","")
+    .replace("字幕","")
+    .replace("文","")
+    .replace("JAP","")
+    .replace("内挂","")
+    .replace("附字","");
+
+}
+function processDpi(dpi:string){
+    return dpi.trim()
+    // .replace("@")
 }
 export function processMovieTitle(torrentTitle:string){
     logger.debug("Find Movie and OVA now...\n can't process anymore,please find it in /mova.txt,modify yourself and put it into mova.json");
@@ -184,9 +189,5 @@ export function processAnimeTitle(torrentTitle:string):bangumiTorrent {
         bgmId  : "",//mikanani.id
     }
 }
-// function getGroup(title: string):string {
-//     const match = title.match(/[\[\]]/);
-//     return  match ? match[0]:"";
-// }
 
 
