@@ -11,6 +11,17 @@ const skip_list : string[]= [
 ];//跳过的字幕组（由于regex无法处理）
 const skip_keyword = ["全集","哆啦A梦","哆啦a梦","柯南","海贼"]
 const skip_regex = [/[0-9][0-9]-[0-9][0-9]/]
+async function writeToFile(line: string, filePath: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      fs.appendFile(filePath, line + '\n', (err) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve();
+        }
+      });
+    });
+  }
 const client = new Client({
     host: 'localhost',
     port: 5432,
@@ -23,7 +34,7 @@ const config = {
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) Gecko/20100101 Firefox/113.0",
     }
 }
-const HOMEPAGE = 'https://mikanani.me/';
+const HOMEPAGE = 'https://mikanani.me/Home/BangumiCoverFlowByDayOfWeek?year=2023&seasonStr=%E5%86%AC';
 const RSS_URL = 'https://mikanani.me/RSS/Bangumi?bangumiId='//+bgmId
 export async function parseAll(){//HomePage first.
     logger.debug("Start grabing..")
@@ -165,7 +176,8 @@ export async function parseBangumi(href : string,image :string, title: string,do
                     return url.replace("https://mikanani.me/Download/","").replace(".torrent","");
                 }
                 
-                // await writeToFile(JSON.stringify([torrentAttr.group,torrentAttr.name,torrentAttr.episode,torrentAttr.sub,torrentAttr.dpi,torrentAttr.source]),"process.txt");
+                await writeToFile(JSON.stringify([torrentAttr.group,torrentAttr.name,torrentAttr.episode,torrentAttr.sub,torrentAttr.dpi,torrentAttr.source]),"process.txt");
+                await writeToFile(ele.title || "","source.txt");
                 torrentAttr.torrent = dealTorrent(ele.enclosure?.url || "https://mikanani.me/Download/.torrent");
                 await saveToBangumiDB(torrentAttr,ele.title || "");
             })
